@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WI-FI Lite Locations</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="Styles.css">
+
+  <style>
+    .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .search-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      max-width: 600px;
+      margin: 0 auto;
+      gap: 10px;
+    }
+
+    #searchBox {
+      flex-grow: 1;
+      min-width: 250px;
+      padding: 5px 10px;
+    }
+
+    #statusFilter {
+      padding: 5px 10px;
+    }
+  </style>
+</head>
+<body>
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; position: relative;">
+    <!-- Left: Logo -->
+    <img src="Umoja_Logo_320x86_png.avif" alt="Umoja Logo" style="height: 50px;">
+
+    <!-- Center: Title -->
+    <h2 style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0;">
+      WI-FI Lite Locations
+    </h2>
+  </div>
+
+  <!-- Navigation -->
+  <div class="container">
+    <!-- Buttons -->
+    <div class="nav-left">
+      <a href="Locations.html" class="button">Home</a>
+      <a href="Baicells_Location.html" class="button">Baicell</a>
+      <a href="G5010_Locations.html" class="button">G5010</a>
+    </div>
+
+    <div class="nav-center">
+      <input type="text" id="searchBox" placeholder="Search by Customer Name...">
+    </div>
+
+    <!-- Search Bar and Dropdown -->
+    <div class="nav-right">
+      <label for="statusFilter" style="margin-right: 10px;">Status:</label>    
+      <select id="statusFilter">
+        <option value="all">All</option>
+        <option value="ok">ok</option>
+        <option value="critical">Critical</option>
+        <option value="problem">Problem</option>
+        <option value="unknown">Unknown</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Load Leaflet JS AFTER the HTML content -->
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    setTimeout(function(){ location.reload(); }, 180000);
+  
+    var sheetID = '1JwpWie2gQ4L23JUu27eAgep5bO83q700hvU63NMI42s';
+    var sheetName = 'CPE Status';
+    var apiKey = 'AIzaSyB7KkrxEuYwukMKD_IrI26Mj6NEijnlcck';
+    var apiURL = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${sheetName}?alt=json&key=${apiKey}`;
+  
+    var map = L.map('map').setView([-26.344971, 27.830788], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+  
+    var markers = [];
+  
+    function clearMarkers() {
+      markers.forEach(marker => map.removeLayer(marker));
+      markers = [];
+    }
+  
+    fetch(apiURL)
+      .then(response => response.json())
+      .then(data => {
+        var values = data.values;
+        if (!values || values.length === 0) return;
+  
+        var headers = values[0];
+        var latIndex = headers.indexOf('Latitude');
+        var lonIndex = headers.indexOf('Longitude');
+        var nameIndex = headers.indexOf('Customer Name');
+        var statusIndex = headers.indexOf('Exact Status');
+        var devTypeIndex = headers.indexOf('Device Type');
+  
+        function addMarkers(searchFilter = "", statusFilter = "all") {
+          clearMarkers();
+  
+          for (var i = 1; i < values.length; i++) {
+            var row = values[i];
+            var lat = parseFloat(row[latIndex]);
+            var lon = parseFloat(row[lonIndex]);
+            var name = row[nameIndex];
+            var status = row[statusIndex] ? row[statusIndex].toLowerCase().trim() : "unknown";
+            var deviceType = row[devTypeIndex] ? row[devTypeIndex].toLowerCase().trim() : "";
+  
+            if (deviceType !== "cpe200" && deviceType !== "g720") continue;
+            if (searchFilter && !name.toLowerCase().includes(searchFilter.toLowerCase())) continue;
+            if (statusFilter !== "all" && status !== statusFilter) continue;
+  
+            var color = (status === "ok") ? "green" :
+                        (status === "critical") ? "red" :
+                        (status === "problem") ? "orange" : "gray";
+  
+            if (!isNaN(lat) && !isNaN(lon)) {
+              let marker = L.circleMarker([lat, lon], {
+                radius: 8,
+                fillColor: color,
+                color: "#000",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+              }).bindPopup(`<b>${name}</b><br>Status: ${status}<br>Device Type: ${deviceType.toUpperCase()}`);
+  
+              markers.push(marker);
+              marker.addTo(map);
+            }
+          }
+        }
+  
+        // DOM elements
+        const searchBox = document.getElementById("searchBox");
+        const statusDropdown = document.getElementById("statusFilter");
+  
+        // Restore session values if available
+        const savedSearch = sessionStorage.getItem("wifiLiteSearch") || "";
+        const savedStatus = sessionStorage.getItem("wifiLiteStatus") || "all";
+        searchBox.value = savedSearch;
+        statusDropdown.value = savedStatus;
+  
+        function updateMarkers() {
+          const searchVal = searchBox.value;
+          const statusVal = statusDropdown.value.toLowerCase();
+  
+          // Save to session
+          sessionStorage.setItem("wifiLiteSearch", searchVal);
+          sessionStorage.setItem("wifiLiteStatus", statusVal);
+  
+          addMarkers(searchVal, statusVal);
+        }
+  
+        // Apply session values on load
+        updateMarkers();
+  
+        searchBox.addEventListener("input", updateMarkers);
+        statusDropdown.addEventListener("change", updateMarkers);
+      })
+      .catch(error => console.error('Error fetching data:', error));
+  </script>
+  
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Baicells and WI-FI Lite Locations</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="Styles.css">
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+  <script>
+    // Hide body content initially until auth check is complete
+    document.documentElement.style.display = 'none';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCc97mSOD6ne15yTH19ypS63k0NXtHUYW4",
+      authDomain: "umoja-device-locations.firebaseapp.com",
+      projectId: "umoja-device-locations",
+      appId: "1:54888722130:web:d4ae814be69d452fb7070b"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    auth.onAuthStateChanged(user => {
+      if (!user) {
+        window.location.href = "Login.html";
+      } else {
+        document.documentElement.style.display = ''; // Show content
+        initPage(); // Continue with app logic
+      }
+    });
+  </script>
+</head>
+<body>
+  <!-- Header -->
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; position: relative;">
+    <img src="Umoja_Logo_320x86_png.avif" alt="Umoja Logo" style="height: 50px;">
+    <h2 style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0;">
+      Baicells and WI-FI Lite Locations
+    </h2>
+  </div>
+
+  <!-- Navigation -->
+  <div class="container">
+    <div class="nav-left">
+      <a href="Baicells_Location.html" class="button">Baicell</a>
+      <a href="CPE200_Locations.html" class="button">WI-FI Lite</a>
+      <a href="G5010_Locations.html" class="button">G5010</a>
+    </div>
+
+    <div class="nav-center">
+      <input type="text" id="searchBox" placeholder="Search by Customer Name...">
+    </div>
+
+    <div class="nav-right">
+      <label for="statusFilter" style="margin-right: 5px;">Status:</label>
+      <select id="statusFilter">
+        <option value="all">All</option>
+        <option value="ok">ok</option>
+        <option value="critical">Critical</option>
+        <option value="problem">Problem</option>
+        <option value="unknown">Unknown</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    window.setSearchBoxValue = function(customerName) {
+      document.getElementById('searchBox').value = customerName;
+      document.getElementById("searchBox").dispatchEvent(new Event('input'));
+    };
+
+    function initPage() {
+      setTimeout(() => location.reload(), 180000); // Auto-refresh every 3 minutes
+
+      const sheetID = '1JwpWie2gQ4L23JUu27eAgep5bO83q700hvU63NMI42s';
+      const sheetName = 'CPE Status';
+      const apiKey = 'AIzaSyB7KkrxEuYwukMKD_IrI26Mj6NEijnlcck';
+      const apiURL = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${sheetName}?alt=json&key=${apiKey}`;
+
+      const savedZoom = parseFloat(sessionStorage.getItem("mapZoom")) || 13;
+      const savedLat = parseFloat(sessionStorage.getItem("mapLat")) || -26.344971;
+      const savedLng = parseFloat(sessionStorage.getItem("mapLng")) || 27.830788;
+
+      const map = L.map('map').setView([savedLat, savedLng], savedZoom);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      map.on('moveend zoomend', () => {
+        const center = map.getCenter();
+        sessionStorage.setItem("mapLat", center.lat);
+        sessionStorage.setItem("mapLng", center.lng);
+        sessionStorage.setItem("mapZoom", map.getZoom());
+      });
+
+      const searchBox = document.getElementById("searchBox");
+      const statusSelect = document.getElementById("statusFilter");
+
+      const savedSearch = sessionStorage.getItem("searchText") || "";
+      const savedStatus = sessionStorage.getItem("statusFilter") || "all";
+      searchBox.value = savedSearch;
+      statusSelect.value = savedStatus;
+
+      let markers = [];
+      function clearMarkers() {
+        markers.forEach(marker => map.removeLayer(marker));
+        markers = [];
+      }
+
+      fetch(apiURL)
+        .then(response => response.json())
+        .then(data => {
+          const values = data.values;
+          if (!values || values.length === 0) return;
+
+          const headers = values[0];
+          const latIndex = headers.indexOf('Latitude');
+          const lonIndex = headers.indexOf('Longitude');
+          const nameIndex = headers.indexOf('Customer Name');
+          const statusIndex = headers.indexOf('Exact Status');
+          const devTypeIndex = headers.indexOf('Device Type');
+          const hostIndex = headers.indexOf('CPE200 Host');
+
+          function addMarkers(searchFilter = "", statusFilter = "all") {
+            clearMarkers();
+
+            for (let i = 1; i < values.length; i++) {
+              const row = values[i];
+              const lat = parseFloat(row[latIndex]);
+              const lon = parseFloat(row[lonIndex]);
+              const name = row[nameIndex];
+              const status = row[statusIndex]?.toLowerCase().trim() || "unknown";
+              const deviceType = row[devTypeIndex]?.toLowerCase().trim() || "";
+              const cpeHost = row[hostIndex]?.toLowerCase().trim() || "";
+
+              if (deviceType !== "baicell" && deviceType !== "cpe200") continue;
+              if (searchFilter && !name.toLowerCase().includes(searchFilter.toLowerCase())) continue;
+              if (statusFilter !== "all" && status !== statusFilter) continue;
+
+              const color = (status === "ok") ? "green" :
+                            (status === "critical") ? "red" :
+                            (status === "problem") ? "orange" : "gray";
+              const isCpeLike = (deviceType === "cpe200" || deviceType === "g720");
+              const markerShape = isCpeLike ? 'circle' : 'location';
+
+              if (!isNaN(lat) && !isNaN(lon)) {
+                let marker;
+                if (markerShape === 'circle') {
+                  marker = L.circleMarker([lat, lon], {
+                    radius: 8,
+                    fillColor: color,
+                    color: "#000",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                  }).bindPopup(`<b>${name}</b><br>Status: ${status}` + 
+                    (isCpeLike ? `<br><a href="#" onclick="setSearchBoxValue('${cpeHost}')" style="text-decoration:none">CPE200 Host: ${cpeHost}</a>` : ''));
+                } else {
+                  const locationIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<i class="fa-solid fa-location-dot" style="color: ${color};"></i>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 24],
+                    popupAnchor: [0, -24]
+                  });
+
+                  marker = L.marker([lat, lon], { icon: locationIcon })
+                    .bindPopup(`<b>${name}</b><br>Status: ${status}`);
+                }
+
+                markers.push(marker);
+                marker.addTo(map);
+              }
+            }
+          }
+
+          function updateMarkers() {
+            const searchVal = searchBox.value;
+            const statusVal = statusSelect.value.toLowerCase();
+            sessionStorage.setItem("searchText", searchVal);
+            sessionStorage.setItem("statusFilter", statusVal);
+            addMarkers(searchVal, statusVal);
+          }
+
+          searchBox.addEventListener("input", updateMarkers);
+          statusSelect.addEventListener("change", updateMarkers);
+
+          updateMarkers();
+        })
+        .catch(error => console.error('Error fetching data:', error));
+    }
+  </script>
+</body>
+</html>

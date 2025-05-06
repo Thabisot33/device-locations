@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>G5010 Locations</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Shared styles -->
+  <link rel="stylesheet" href="Styles.css">
+</head>
+
+<body>
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; position: relative;">
+    <img src="Umoja_Logo_320x86_png.avif" alt="Umoja Logo" style="height: 50px;">
+    <h2 style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0;background: transparent;">
+      G5010 Locations
+    </h2>
+  </div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 10px 20px;">
+    <div style="display: flex; gap: 10px;">
+      <a href="Locations.html" class="button">Home</a>
+      <a href="Baicells_Location.html" class="button">Baicells</a>
+      <a href="CPE200_Locations.html" class="button">WI-FI Lite</a>
+    </div>
+
+    <div style="flex-grow: 1; display: flex; justify-content: center;">
+      <input type="text" id="searchBox" placeholder="Search by Name..." style="padding: 5px; width: 250px;">
+    </div>
+
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <label for="filterDropdown">Devices:</label>
+      <select id="filterDropdown" style="padding: 5px;">
+        <option value="All">All</option>
+        <option value="WithAX820">G5010 with AX820</option>
+        <option value="WithoutAX820">G5010</option>
+      </select>
+
+      <label for="statusDropdown">Status:</label>
+      <select id="statusDropdown" style="padding: 5px;">
+        <option value="All">All</option>
+        <option value="online">Online</option>
+        <option value="offline">Offline</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="map" style="height: 80vh;"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    setTimeout(function () { location.reload(); }, 180000);
+  
+    const sheetID = '1JwpWie2gQ4L23JUu27eAgep5bO83q700hvU63NMI42s';
+    const sheetName = 'ACS Monitoring';
+    const apiKey = 'AIzaSyB7KkrxEuYwukMKD_IrI26Mj6NEijnlcck';
+    const apiURL = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${sheetName}?alt=json&key=${apiKey}`;
+  
+    const map = L.map('map').setView([-26.344971, 27.830788], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+  
+    let markers = [];
+  
+    function addMarkers(values, headers) {
+      const latIndex = headers.indexOf('Latitude');
+      const lonIndex = headers.indexOf('Longitude');
+      const nameIndex = headers.indexOf('CUSTOMER NAme');
+      const statusIndex = headers.indexOf('Exact Status');
+      const ax820Index = headers.indexOf('AX820');
+  
+      const filterValue = document.getElementById("filterDropdown").value;
+      const statusFilter = document.getElementById("statusDropdown").value;
+  
+      markers.forEach(marker => map.removeLayer(marker));
+      markers = [];
+  
+      for (let i = 2; i < values.length; i++) {
+        const row = values[i];
+        const lat = parseFloat(row[latIndex]);
+        const lon = parseFloat(row[lonIndex]);
+        const name = row[nameIndex];
+        const status = row[statusIndex]?.toLowerCase().trim() || "unknown";
+        const axValue = row[ax820Index] || "#N/A";
+  
+        // AX820 filter logic
+        if (filterValue === "WithAX820" && axValue === "#N/A") continue;
+        if (filterValue === "WithoutAX820" && axValue !== "#N/A") continue;
+  
+        if (statusFilter !== "All" && status !== statusFilter) continue;
+  
+        const color = status === "online" ? "green" :
+                      status === "offline" ? "red" :
+                      status === "problem" ? "orange" : "gray";
+  
+        if (!isNaN(lat) && !isNaN(lon)) {
+          const locationIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<i class="fa-solid fa-location-dot" style="color: ${color}; font-size: 24px;"></i>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 24],
+            popupAnchor: [0, -24]
+          });
+  
+          const marker = L.marker([lat, lon], { icon: locationIcon })
+            .addTo(map)
+            .bindPopup(`<b>${name}</b><br>Status: ${status}`);
+  
+          marker.name = name.toLowerCase();
+          markers.push(marker);
+        }
+      }
+    }
+  
+    let sheetData = null;
+  
+    fetch(apiURL)
+      .then(response => response.json())
+      .then(data => {
+        const values = data.values;
+        if (!values || values.length < 3) return;
+  
+        sheetData = values;
+        const headers = values[1]; // Row 2 contains headers
+        addMarkers(values, headers);
+      })
+      .catch(error => console.error('Error fetching data:', error));
+  
+    // Initialize session values for dropdowns and search
+    const savedFilter = sessionStorage.getItem("g5010Filter") || "All";
+    const savedStatus = sessionStorage.getItem("g5010Status") || "All";
+    const savedSearch = sessionStorage.getItem("g5010Search") || "";
+  
+    document.getElementById("filterDropdown").value = savedFilter;
+    document.getElementById("statusDropdown").value = savedStatus;
+    document.getElementById("searchBox").value = savedSearch;
+  
+    // Event listeners for dropdown changes and search input
+    document.getElementById("filterDropdown").addEventListener("change", () => {
+      const filterValue = document.getElementById("filterDropdown").value;
+      sessionStorage.setItem("g5010Filter", filterValue);
+      if (sheetData) addMarkers(sheetData, sheetData[1]);
+    });
+  
+    document.getElementById("statusDropdown").addEventListener("change", () => {
+      const statusValue = document.getElementById("statusDropdown").value;
+      sessionStorage.setItem("g5010Status", statusValue);
+      if (sheetData) addMarkers(sheetData, sheetData[1]);
+    });
+  
+    document.getElementById("searchBox").addEventListener("input", function () {
+      const searchText = this.value.toLowerCase();
+      sessionStorage.setItem("g5010Search", searchText);
+  
+      markers.forEach(marker => {
+        marker.setOpacity(marker.name.includes(searchText) ? 1 : 0);
+      });
+    });
+  </script>  
+</body>
+</html>
