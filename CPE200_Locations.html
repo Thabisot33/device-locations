@@ -50,6 +50,17 @@
     #statusFilter {
       padding: 5px 10px;
     }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .email {
+      font-size: 14px;
+      color: #555;
+    }
   </style>
 </head>
 <body>
@@ -58,9 +69,11 @@
     <img src="Umoja_Logo_320x86_png.avif" alt="Umoja Logo" style="height: 50px;">
 
     <!-- Center: Title -->
-    <h2 style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0;">
-      WI-FI Lite Locations
-    </h2>
+    <h2 style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0;">WI-FI Lite Locations</h2>
+    <div class="user-info">
+      <a href="registation.html" class="add-user-button">Add New User</a>
+      <span class="email">user@example.com</span> <!-- Replace with dynamic email if needed -->
+    </div>
   </div>
 
   <!-- Navigation -->
@@ -78,7 +91,7 @@
 
     <!-- Search Bar and Dropdown -->
     <div class="nav-right">
-      <label for="statusFilter" style="margin-right: 10px;">Status:</label>    
+      <label for="statusFilter" style="margin-right: 10px;">Status:</label>
       <select id="statusFilter">
         <option value="all">All</option>
         <option value="ok">ok</option>
@@ -89,7 +102,7 @@
     </div>
   </div>
 
-  <div id="map"></div>
+  <div id="map" style="height: 80vh;"></div>
 
   <!-- Load Leaflet JS AFTER the HTML content -->
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -101,11 +114,15 @@
     var apiKey = 'AIzaSyB7KkrxEuYwukMKD_IrI26Mj6NEijnlcck';
     var apiURL = `https://sheets.googleapis.com/v4/spreadsheets/${sheetID}/values/${sheetName}?alt=json&key=${apiKey}`;
   
-    var map = L.map('map').setView([-26.344971, 27.830788], 13);
+    var savedZoom = parseFloat(sessionStorage.getItem("wifiLiteZoom")) || 13;
+    var savedLat = parseFloat(sessionStorage.getItem("wifiLiteLat")) || -26.344971;
+    var savedLng = parseFloat(sessionStorage.getItem("wifiLiteLng")) || 27.830788;
+
+    var map = L.map('map').setView([savedLat, savedLng], savedZoom);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
-  
+
     var markers = [];
   
     function clearMarkers() {
@@ -187,6 +204,13 @@
   
         searchBox.addEventListener("input", updateMarkers);
         statusDropdown.addEventListener("change", updateMarkers);
+  
+        map.on('moveend zoomend', () => {
+          const center = map.getCenter();
+          sessionStorage.setItem("wifiLiteLat", center.lat);
+          sessionStorage.setItem("wifiLiteLng", center.lng);
+          sessionStorage.setItem("wifiLiteZoom", map.getZoom());
+        });
       })
       .catch(error => console.error('Error fetching data:', error));
   </script>

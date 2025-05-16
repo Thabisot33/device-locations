@@ -20,8 +20,17 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
+  <style>
+    .user-email {
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+      margin-left: auto;
+      padding-left: 15px;
+    }
+  </style>
+
   <script type="module">
-    // Firebase configuration
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     
@@ -35,11 +44,16 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
 
-    // Firebase Auth Redirect Logic
     onAuthStateChanged(auth, user => {
       if (!user) {
         window.location.href = "Login.html";
       } else {
+        // Store email for cross-page use
+        sessionStorage.setItem("userEmail", user.email);
+        // Display email
+        const emailSpan = document.getElementById("userEmailDisplay");
+        if (emailSpan) emailSpan.textContent = user.email;
+
         initMapPage();
       }
     });
@@ -153,6 +167,8 @@
   <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; position: relative;">
     <img src="Umoja_Logo_320x86_png.avif" alt="Umoja Logo" style="height: 50px;">
     <h2 style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0;">Baicells Locations</h2>
+    <div class="user-email" id="userEmailDisplay"></div>
+    <a href="registation.html" class="add-user-button" style="margin-left: 15px;">Add New User</a>
   </div>
 
   <div class="container">
@@ -161,9 +177,11 @@
       <a href="CPE200_Locations.html" class="button">WI-FI Lite</a>
       <a href="G5010_Locations.html" class="button">G5010</a>
     </div>
+
     <div class="nav-center">
       <input type="text" id="searchBox" placeholder="Search by Customer Name...">
     </div>
+
     <div class="nav-right">
       <label for="statusFilter">Status:</label>
       <select id="statusFilter">

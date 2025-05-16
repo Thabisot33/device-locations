@@ -20,7 +20,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
   <script>
-    // Hide body content initially until auth check is complete
     document.documentElement.style.display = 'none';
 
     const firebaseConfig = {
@@ -37,19 +36,24 @@
       if (!user) {
         window.location.href = "Login.html";
       } else {
-        document.documentElement.style.display = ''; // Show content
-        initPage(); // Continue with app logic
+        document.documentElement.style.display = '';
+
+        // Display email next to User button
+        const email = sessionStorage.getItem("email") || user.email;
+        document.getElementById("user-email").textContent = `(${email})`;
+
+        initPage();
       }
     });
   </script>
 </head>
 <body>
   <!-- Header -->
-  <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; position: relative;">
-    <img src="Umoja_Logo_320x86_png.avif" alt="Umoja Logo" style="height: 50px;">
-    <h2 style="position: absolute; left: 50%; transform: translateX(-50%); margin: 0;">
-      Baicells and WI-FI Lite Locations
-    </h2>
+  <div class="header-bar">
+    <a href="https://umoja.network"><img src="Umoja_Logo_320x86_png.avif" alt="Umoja Logo" class="logo"></a>
+    <h2 class="title">Baicells and WI-FI Lite Locations</h2>
+    <a href="Users.html" class="add-user-button">User</a>
+    <span id="user-email" style="margin-left: 10px; font-weight: normal;"></span>
   </div>
 
   <!-- Navigation -->

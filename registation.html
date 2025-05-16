@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Add New User</title>
+
+  <link rel="stylesheet" href="Styles.css">
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCc97mSOD6ne15yTH19ypS63k0NXtHUYW4",
+      authDomain: "umoja-device-locations.firebaseapp.com",
+      projectId: "umoja-device-locations",
+      databaseURL: "https://umoja-device-locations-default-rtdb.europe-west1.firebasedatabase.app/",
+      appId: "1:54888722130:web:d4ae814be69d452fb7070b"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+  </script>
+</head>
+<body class="register-body">
+  <div class="form-container">
+    <h2>Add New User</h2>
+    <form id="addUserForm">
+      <input type="text" id="fullName" placeholder="Full Name" required>
+      <input type="text" id="surname" placeholder="Surname" required>
+      <input type="email" id="email" placeholder="Email" required>
+      <input type="password" id="password" placeholder="Password (min 6 characters)" required>
+      <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+      <button type="submit">Add User</button>
+      <div class="message" id="message"></div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('addUserForm');
+    const messageDiv = document.getElementById('message');
+
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      const fullName = document.getElementById('fullName').value.trim();
+      const surname = document.getElementById('surname').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (password !== confirmPassword) {
+        messageDiv.textContent = "❌ Passwords do not match. Please re-enter.";
+        messageDiv.className = 'message error';
+        return;
+      }
+
+      firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then(userCredential => {
+          const user = userCredential.user;
+          const userId = user.uid;
+
+          // Save additional user info to Realtime Database
+          firebase.database().ref('users/' + userId).set({
+            fullName: fullName,
+            surname: surname,
+            email: email,
+            createdAt: new Date().toISOString()
+          })
+          .then(() => {
+            alert('✅ New user added and data saved!');
+            window.location.href = 'users.html';
+          })
+          .catch((dbError) => {
+            messageDiv.textContent = "Database error: " + dbError.message;
+            messageDiv.className = 'message error';
+          });
+        })
+        .catch(error => {
+          messageDiv.textContent = error.message;
+          messageDiv.className = 'message error';
+        });
+    });
+  </script>
+</body>
+</html>
